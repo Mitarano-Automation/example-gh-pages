@@ -141,6 +141,7 @@
     };
 
     const Q = new Map();
+    let bestQ = new Map(); // snapshot of best policy so far
     let bestPolicyScore = 0;
     let returns = [];
 
@@ -165,12 +166,27 @@
       return Q.get(k);
     }
 
-    function chooseAction(stateKey, eps) {
+    function cloneQTable(src) {
+      const out = new Map();
+      for (const [k, v] of src.entries()) out.set(k, [v[0], v[1]]);
+      return out;
+    }
+
+    function chooseActionFromTable(table, stateKey, eps, createIfMissing = false) {
       if (Math.random() < eps) return Math.random() < 0.5 ? 0 : 1;
-      const [q0, q1] = getQ(stateKey);
+      let q = table.get(stateKey);
+      if (!q && createIfMissing) {
+        table.set(stateKey, [0, 0]);
+        q = table.get(stateKey);
+      }
+      const [q0, q1] = q || [0, 0];
       if (q1 > q0) return 1;
       if (q0 > q1) return 0;
       return Math.random() < 0.5 ? 0 : 1; // tie-break random
+    }
+
+    function chooseAction(stateKey, eps) {
+      return chooseActionFromTable(Q, stateKey, eps, true);
     }
 
     // --- UI & rendering
@@ -268,7 +284,10 @@
         }
 
         returns.push(total);
-        bestPolicyScore = Math.max(bestPolicyScore, total);
+        if (total > bestPolicyScore) {
+          bestPolicyScore = total;
+          bestQ = cloneQTable(Q); // keep best policy separate from current policy
+        }
         eps = Math.max(epsMin, eps * epsDecay);
         alpha = Math.max(0.08, alpha * 0.999);
 
@@ -286,17 +305,17 @@
     let playing = false;
     async function playPolicy() {
       if (playing) return;
-      if (Q.size === 0) {
-        statusEl.textContent = 'Keine gelernte Policy vorhanden. Bitte erst trainieren.';
+      if (bestQ.size === 0) {
+        statusEl.textContent = 'Keine gelernte Best-Policy vorhanden. Bitte erst trainieren.';
         return;
       }
       playing = true;
-      statusEl.textContent = 'Spiele beste gelernte Policy...';
+      statusEl.textContent = 'Spiele gespeicherte Best-Policy...';
       let s = env.reset();
       let steps = 0;
 
       while (!env.done && steps < 500) {
-        const a = chooseAction(key(s), 0);
+        const a = chooseActionFromTable(bestQ, key(s), 0, false);
         const out = env.step(a);
         s = out.state;
         steps++;
@@ -315,7 +334,8 @@
     document.getElementById('play').addEventListener('click', playPolicy);
     document.getElementById('reset').addEventListener('click', () => {
       env.reset();
-      Q.clear(); // learned policy truly reset
+      Q.clear(); // current learned policy reset
+      bestQ.clear(); // stored best policy reset
       returns = [];
       bestPolicyScore = 0;
       playing = false;
