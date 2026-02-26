@@ -168,7 +168,9 @@
     function chooseAction(stateKey, eps) {
       if (Math.random() < eps) return Math.random() < 0.5 ? 0 : 1;
       const [q0, q1] = getQ(stateKey);
-      return q1 > q0 ? 1 : 0;
+      if (q1 > q0) return 1;
+      if (q0 > q1) return 0;
+      return Math.random() < 0.5 ? 0 : 1; // tie-break random
     }
 
     // --- UI & rendering
@@ -284,6 +286,10 @@
     let playing = false;
     async function playPolicy() {
       if (playing) return;
+      if (Q.size === 0) {
+        statusEl.textContent = 'Keine gelernte Policy vorhanden. Bitte erst trainieren.';
+        return;
+      }
       playing = true;
       statusEl.textContent = 'Spiele beste gelernte Policy...';
       let s = env.reset();
