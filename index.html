@@ -253,7 +253,24 @@
       const last = returns.slice(-50);
       const avg = last.length ? last.reduce((a,b)=>a+b,0) / last.length : 0;
       avgEl.textContent = avg.toFixed(1);
-      bestEl.textContent = bestPolicyScore;
+      bestEl.textContent = Number(bestPolicyScore).toFixed(1);
+    }
+
+    function evaluatePolicy(table, episodes = 5) {
+      let total = 0;
+      for (let i = 0; i < episodes; i++) {
+        const evalEnv = new CartPole();
+        let s = evalEnv.reset();
+        let steps = 0;
+        while (!evalEnv.done && steps < 500) {
+          const a = chooseActionFromTable(table, key(s), 0, false);
+          const out = evalEnv.step(a);
+          s = out.state;
+          steps++;
+        }
+        total += steps;
+      }
+      return total / episodes;
     }
 
     async function train(episodes = 400) {
@@ -284,9 +301,12 @@
         }
 
         returns.push(total);
-        if (total > bestPolicyScore) {
-          bestPolicyScore = total;
-          bestQ = cloneQTable(Q); // keep best policy separate from current policy
+        if (ep % 10 === 0) {
+          const score = evaluatePolicy(Q, 5); // less noisy than single training episode
+          if (score > bestPolicyScore) {
+            bestPolicyScore = score;
+            bestQ = cloneQTable(Q); // keep best policy separate from current policy
+          }
         }
         eps = Math.max(epsMin, eps * epsDecay);
         alpha = Math.max(0.08, alpha * 0.999);
@@ -325,7 +345,6 @@
       }
 
       statusEl.textContent = `Fertig: ${steps} Schritte gehalten.`;
-      bestPolicyScore = Math.max(bestPolicyScore, steps);
       updateStats(epEl.textContent, steps);
       playing = false;
     }
