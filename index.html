@@ -309,10 +309,12 @@
     document.getElementById('play').addEventListener('click', playPolicy);
     document.getElementById('reset').addEventListener('click', () => {
       env.reset();
+      Q.clear(); // learned policy truly reset
       returns = [];
       bestPolicyScore = 0;
+      playing = false;
       updateStats(0, 0);
-      statusEl.textContent = 'Reset. Bereit.';
+      statusEl.textContent = 'Reset (inkl. Q-Tabelle). Bereit.';
       draw(env);
     });
 
