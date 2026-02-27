@@ -155,6 +155,38 @@
       color: var(--muted);
       font-size: .85rem;
     }
+    .map-wrap {
+      position: relative;
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--canvas);
+      min-height: 280px;
+    }
+    .map-wrap iframe {
+      width: 100%;
+      height: 300px;
+      border: 0;
+      display: block;
+    }
+    .map-overlay {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      display: grid;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .chip {
+      background: color-mix(in oklab, var(--wrap) 82%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: .8rem;
+      color: var(--text);
+      backdrop-filter: blur(4px);
+    }
   </style>
 </head>
 <body>
@@ -212,6 +244,15 @@
           <div class="metric stat">Starkregen-Historie: <b id="m-rain">0</b>/100</div>
           <div id="risk-text" class="hint">Gib links eine Adresse ein und starte die Analyse.</div>
           <div id="risk-meta" class="hint"></div>
+
+          <div class="map-wrap" aria-label="Kartenansicht zur Adresse">
+            <iframe id="map-frame" title="OpenStreetMap Fokusansicht" loading="lazy"></iframe>
+            <div class="map-overlay">
+              <div class="chip">Score: <b id="map-score">0</b></div>
+              <div class="chip">Regen: <b id="map-rain">0</b></div>
+              <div class="chip">Flussnähe: <b id="map-river">0</b></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -493,6 +534,10 @@
     const mElevation = document.getElementById('m-elevation');
     const mSurface = document.getElementById('m-surface');
     const mRain = document.getElementById('m-rain');
+    const mapFrame = document.getElementById('map-frame');
+    const mapScore = document.getElementById('map-score');
+    const mapRain = document.getElementById('map-rain');
+    const mapRiver = document.getElementById('map-river');
 
     function bucket(score) {
       if (score < 35) return { key: 'low', label: 'NIEDRIG' };
@@ -519,6 +564,17 @@
       return res.json();
     }
 
+    function setMapFocus(lat, lon) {
+      const d = 0.01;
+      const left = (lon - d).toFixed(5);
+      const right = (lon + d).toFixed(5);
+      const bottom = (lat - d).toFixed(5);
+      const top = (lat + d).toFixed(5);
+      mapFrame.src = `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lon.toFixed(5)}`;
+    }
+
+    setMapFocus(50.1109, 8.6821);
+
     floodForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = new FormData(floodForm);
@@ -542,6 +598,8 @@
         const g0 = geo[0];
         const lat = Number(g0.lat);
         const lon = Number(g0.lon);
+
+        setMapFocus(lat, lon);
 
         const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum,precipitation_hours&hourly=rain&timezone=auto&forecast_days=3`;
         const meteo = await fetchJson(meteoUrl);
@@ -577,6 +635,10 @@
         mElevation.textContent = String(elevationRisk);
         mSurface.textContent = String(surface);
         mRain.textContent = String(rain);
+
+        mapScore.textContent = String(score);
+        mapRain.textContent = String(rain);
+        mapRiver.textContent = String(river);
 
         const rec = b.key === 'high'
           ? 'Empfehlung: Rückstausicherung, mobile Schutzsysteme und Versicherungscheck priorisieren.'
