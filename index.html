@@ -15,6 +15,8 @@
       --canvas: #0b1220;
       --stat: #cbd5e1;
       --ok: #34d399;
+      --warn: #f59e0b;
+      --danger: #ef4444;
       --track: #334155;
       --cart: #60a5fa;
       --pole: #f59e0b;
@@ -31,6 +33,8 @@
       --canvas: #eef2f7;
       --stat: #334155;
       --ok: #059669;
+      --warn: #b45309;
+      --danger: #b91c1c;
       --track: #94a3b8;
       --cart: #2563eb;
       --pole: #d97706;
@@ -48,7 +52,7 @@
       padding: 24px;
     }
     .wrap {
-      width: min(900px, 100%);
+      width: min(980px, 100%);
       background: var(--wrap);
       border: 1px solid var(--border);
       border-radius: 14px;
@@ -56,6 +60,7 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.18);
     }
     h1 { margin: 0 0 6px; font-size: 1.35rem; }
+    h2 { margin: 0 0 6px; font-size: 1.1rem; }
     p { margin: 0 0 12px; color: var(--muted); }
     canvas {
       width: 100%;
@@ -96,17 +101,21 @@
       padding: 14px;
       background: color-mix(in oklab, var(--wrap) 88%, var(--canvas));
     }
-    .form-grid {
+    .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px;
-      margin-top: 10px;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
     }
     label {
       display: grid;
       gap: 6px;
       font-size: .9rem;
       color: var(--muted);
+      margin-bottom: 10px;
     }
     input {
       border: 1px solid var(--border);
@@ -116,10 +125,30 @@
       color: var(--text);
       font: inherit;
     }
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 12px;
+    .risk-pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: .85rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    .risk-low { background: color-mix(in oklab, var(--ok) 20%, transparent); color: var(--ok); }
+    .risk-medium { background: color-mix(in oklab, var(--warn) 20%, transparent); color: var(--warn); }
+    .risk-high { background: color-mix(in oklab, var(--danger) 20%, transparent); color: var(--danger); }
+    .metric { margin-top: 10px; }
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      transition: width .3s ease;
+      background: linear-gradient(90deg, #22c55e 0%, #eab308 55%, #ef4444 100%);
     }
     .hint {
       margin-top: 8px;
@@ -151,35 +180,39 @@
       <span>Best: <b id="best" class="ok">0</b></span>
     </div>
 
-    <section class="card" aria-labelledby="booking-title">
-      <h2 id="booking-title" style="margin:0; font-size:1.1rem;">Reservierungsformular</h2>
-      <p style="margin-top:6px;">Sende uns deine Anfrage für eine Reservierung.</p>
-      <form id="booking-form" class="form-grid">
-        <label>
-          Name
-          <input type="text" name="name" required autocomplete="name" placeholder="Max Mustermann" />
-        </label>
-        <label>
-          E-Mail
-          <input type="email" name="email" required autocomplete="email" placeholder="max@beispiel.de" />
-        </label>
-        <label>
-          Telefonnummer
-          <input type="tel" name="phone" required autocomplete="tel" placeholder="+49 ..." />
-        </label>
-        <label>
-          Datum
-          <input type="date" name="date" required />
-        </label>
-        <label>
-          Anzahl der Gäste
-          <input type="number" name="guests" required min="1" max="30" value="2" />
-        </label>
-      </form>
-      <div class="form-actions">
-        <button type="submit" form="booking-form">Reservierung anfragen</button>
+    <section class="card" aria-labelledby="flood-title">
+      <h2 id="flood-title">🌊 Demo-Dashboard: Flutungsrisiko-Analyse</h2>
+      <p>Demo-Tool für eine schnelle Ersteinschätzung auf Basis einer Adresse.</p>
+
+      <div class="grid">
+        <form id="flood-form">
+          <label>
+            Adresse
+            <input type="text" id="address" name="address" required placeholder="z. B. Hauptstraße 10, Köln" />
+          </label>
+          <label>
+            Gebäudetyp
+            <input type="text" id="building" name="building" placeholder="z. B. Einfamilienhaus" />
+          </label>
+          <button type="submit">Risiko berechnen</button>
+          <div class="hint">Hinweis: Dies ist eine UI-Demo mit simulierten Werten, keine amtliche Gefahrenkarte.</div>
+        </form>
+
+        <div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <strong id="risk-address">Noch keine Adresse geprüft</strong>
+            <span id="risk-label" class="risk-pill risk-low">NIEDRIG</span>
+          </div>
+          <div class="metric stat">Gesamtrisiko: <b id="risk-score">0</b> / 100</div>
+          <div class="bar"><span id="risk-bar"></span></div>
+
+          <div class="metric stat">Flussnähe: <b id="m-river">0</b>/100</div>
+          <div class="metric stat">Höhenlage: <b id="m-elevation">0</b>/100</div>
+          <div class="metric stat">Versiegelung: <b id="m-surface">0</b>/100</div>
+          <div class="metric stat">Starkregen-Historie: <b id="m-rain">0</b>/100</div>
+          <div id="risk-text" class="hint">Gib links eine Adresse ein und starte die Analyse.</div>
+        </div>
       </div>
-      <div id="booking-status" class="hint">Hinweis: Demo-Formular ohne Serveranbindung.</div>
     </section>
   </main>
 
@@ -189,10 +222,10 @@
     const massCart = 1.0;
     const massPole = 0.1;
     const totalMass = massCart + massPole;
-    const length = 0.5; // half pole length
+    const length = 0.5;
     const poleMassLength = massPole * length;
     const forceMag = 10.0;
-    const tau = 0.02; // seconds per step
+    const tau = 0.02;
 
     const xThreshold = 2.4;
     const thetaThreshold = 12 * Math.PI / 180;
@@ -234,7 +267,6 @@
       }
     }
 
-    // --- Q-learning with discretized state space
     const bins = {
       x:      [-2.4, -1.2, -0.6, -0.2, 0, 0.2, 0.6, 1.2, 2.4],
       xDot:   [-3, -1.5, -0.8, -0.3, 0, 0.3, 0.8, 1.5, 3],
@@ -243,7 +275,7 @@
     };
 
     const Q = new Map();
-    let bestQ = new Map(); // snapshot of best policy so far
+    let bestQ = new Map();
     let bestPolicyScore = 0;
     let returns = [];
 
@@ -255,12 +287,7 @@
 
     function key(s) {
       const [x, xd, th, thd] = s;
-      return [
-        toBin(x, bins.x),
-        toBin(xd, bins.xDot),
-        toBin(th, bins.theta),
-        toBin(thd, bins.tDot)
-      ].join('|');
+      return [toBin(x, bins.x), toBin(xd, bins.xDot), toBin(th, bins.theta), toBin(thd, bins.tDot)].join('|');
     }
 
     function getQ(k) {
@@ -284,14 +311,13 @@
       const [q0, q1] = q || [0, 0];
       if (q1 > q0) return 1;
       if (q0 > q1) return 0;
-      return Math.random() < 0.5 ? 0 : 1; // tie-break random
+      return Math.random() < 0.5 ? 0 : 1;
     }
 
     function chooseAction(stateKey, eps) {
       return chooseActionFromTable(Q, stateKey, eps, true);
     }
 
-    // --- UI & rendering
     const canvas = document.getElementById('sim');
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
@@ -300,8 +326,6 @@
     const avgEl = document.getElementById('avg');
     const bestEl = document.getElementById('best');
     const themeBtn = document.getElementById('theme');
-    const bookingForm = document.getElementById('booking-form');
-    const bookingStatus = document.getElementById('booking-status');
 
     function applyTheme(mode) {
       const light = mode === 'light';
@@ -317,10 +341,7 @@
 
     function draw(e) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       const css = getComputedStyle(document.body);
-
-      // Track line
       const y = 260;
       ctx.strokeStyle = css.getPropertyValue('--track').trim();
       ctx.lineWidth = 2;
@@ -329,15 +350,11 @@
       ctx.lineTo(canvas.width - 40, y + 20);
       ctx.stroke();
 
-      // Convert x in [-2.4, 2.4] to screen
       const sx = ((e.x + xThreshold) / (2 * xThreshold)) * (canvas.width - 80) + 40;
-
-      // Cart
       const cw = 70, ch = 30;
       ctx.fillStyle = css.getPropertyValue('--cart').trim();
       ctx.fillRect(sx - cw/2, y, cw, ch);
 
-      // Pole
       const poleLenPx = 120;
       const px = sx;
       const py = y;
@@ -351,13 +368,11 @@
       ctx.lineTo(ex, ey);
       ctx.stroke();
 
-      // Pivot
       ctx.fillStyle = css.getPropertyValue('--pivot').trim();
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
 
-      // HUD
       ctx.fillStyle = css.getPropertyValue('--hud').trim();
       ctx.font = '14px ui-monospace, monospace';
       ctx.fillText(`x=${e.x.toFixed(2)}  theta=${(e.theta*180/Math.PI).toFixed(2)}°`, 14, 24);
@@ -399,7 +414,6 @@
       for (let ep = 1; ep <= episodes; ep++) {
         let s = env.reset();
         let total = 0;
-
         for (let t = 0; t < 500; t++) {
           const k = key(s);
           const a = chooseAction(k, eps);
@@ -418,10 +432,10 @@
 
         returns.push(total);
         if (ep % 10 === 0) {
-          const score = evaluatePolicy(Q, 5); // less noisy than single training episode
+          const score = evaluatePolicy(Q, 5);
           if (score > bestPolicyScore) {
             bestPolicyScore = score;
-            bestQ = cloneQTable(Q); // keep best policy separate from current policy
+            bestQ = cloneQTable(Q);
           }
         }
         eps = Math.max(epsMin, eps * epsDecay);
@@ -465,12 +479,65 @@
       playing = false;
     }
 
-    bookingForm.addEventListener('submit', (e) => {
+    // --- Flood risk dashboard demo logic
+    const floodForm = document.getElementById('flood-form');
+    const riskAddress = document.getElementById('risk-address');
+    const riskLabel = document.getElementById('risk-label');
+    const riskScore = document.getElementById('risk-score');
+    const riskBar = document.getElementById('risk-bar');
+    const riskText = document.getElementById('risk-text');
+    const mRiver = document.getElementById('m-river');
+    const mElevation = document.getElementById('m-elevation');
+    const mSurface = document.getElementById('m-surface');
+    const mRain = document.getElementById('m-rain');
+
+    function hashStr(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+      }
+      return Math.abs(h >>> 0);
+    }
+
+    function bucket(score) {
+      if (score < 35) return { key: 'low', label: 'NIEDRIG' };
+      if (score < 70) return { key: 'medium', label: 'MITTEL' };
+      return { key: 'high', label: 'HOCH' };
+    }
+
+    floodForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(bookingForm).entries());
-      bookingStatus.textContent = `Danke ${data.name}! Wir haben deine Anfrage für den ${data.date} mit ${data.guests} Gästen erhalten und melden uns unter ${data.email} / ${data.phone}.`;
-      bookingStatus.classList.add('ok');
-      bookingForm.reset();
+      const form = new FormData(floodForm);
+      const address = String(form.get('address') || '').trim();
+      const building = String(form.get('building') || '').trim();
+      const seed = hashStr(address + '|' + building);
+
+      const river = seed % 101;
+      const elevation = (seed >> 3) % 101;
+      const surface = (seed >> 7) % 101;
+      const rain = (seed >> 11) % 101;
+      const score = Math.round(river * 0.35 + (100 - elevation) * 0.25 + surface * 0.2 + rain * 0.2);
+      const b = bucket(score);
+
+      riskAddress.textContent = address;
+      riskLabel.textContent = b.label;
+      riskLabel.className = `risk-pill risk-${b.key}`;
+      riskScore.textContent = String(score);
+      riskBar.style.width = `${score}%`;
+
+      mRiver.textContent = String(river);
+      mElevation.textContent = String(elevation);
+      mSurface.textContent = String(surface);
+      mRain.textContent = String(rain);
+
+      const rec = b.key === 'high'
+        ? 'Empfehlung: Rückstausicherung, mobile Schutzsysteme und Versicherungscheck priorisieren.'
+        : b.key === 'medium'
+          ? 'Empfehlung: Präventive Maßnahmen prüfen (Kellerabdichtung, Entwässerung, Notfallplan).'
+          : 'Empfehlung: Aktuell niedriges Risiko, dennoch jährliche Prüfung sinnvoll.';
+
+      riskText.textContent = rec;
     });
 
     document.getElementById('train').addEventListener('click', () => train(400));
@@ -481,8 +548,8 @@
     });
     document.getElementById('reset').addEventListener('click', () => {
       env.reset();
-      Q.clear(); // current learned policy reset
-      bestQ.clear(); // stored best policy reset
+      Q.clear();
+      bestQ.clear();
       returns = [];
       bestPolicyScore = 0;
       playing = false;
