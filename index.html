@@ -89,6 +89,43 @@
       color: var(--stat);
     }
     .ok { color: var(--ok); }
+    .card {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      background: color-mix(in oklab, var(--wrap) 88%, var(--canvas));
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: .9rem;
+      color: var(--muted);
+    }
+    input {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: var(--canvas);
+      color: var(--text);
+      font: inherit;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .hint {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .85rem;
+    }
   </style>
 </head>
 <body>
@@ -113,6 +150,37 @@
       <span>Ø letzte 50: <b id="avg">0.0</b></span>
       <span>Best: <b id="best" class="ok">0</b></span>
     </div>
+
+    <section class="card" aria-labelledby="booking-title">
+      <h2 id="booking-title" style="margin:0; font-size:1.1rem;">Reservierungsformular</h2>
+      <p style="margin-top:6px;">Sende uns deine Anfrage für eine Reservierung.</p>
+      <form id="booking-form" class="form-grid">
+        <label>
+          Name
+          <input type="text" name="name" required autocomplete="name" placeholder="Max Mustermann" />
+        </label>
+        <label>
+          E-Mail
+          <input type="email" name="email" required autocomplete="email" placeholder="max@beispiel.de" />
+        </label>
+        <label>
+          Telefonnummer
+          <input type="tel" name="phone" required autocomplete="tel" placeholder="+49 ..." />
+        </label>
+        <label>
+          Datum
+          <input type="date" name="date" required />
+        </label>
+        <label>
+          Anzahl der Gäste
+          <input type="number" name="guests" required min="1" max="30" value="2" />
+        </label>
+      </form>
+      <div class="form-actions">
+        <button type="submit" form="booking-form">Reservierung anfragen</button>
+      </div>
+      <div id="booking-status" class="hint">Hinweis: Demo-Formular ohne Serveranbindung.</div>
+    </section>
   </main>
 
   <script>
@@ -232,6 +300,8 @@
     const avgEl = document.getElementById('avg');
     const bestEl = document.getElementById('best');
     const themeBtn = document.getElementById('theme');
+    const bookingForm = document.getElementById('booking-form');
+    const bookingStatus = document.getElementById('booking-status');
 
     function applyTheme(mode) {
       const light = mode === 'light';
@@ -394,6 +464,14 @@
       updateStats(epEl.textContent, steps);
       playing = false;
     }
+
+    bookingForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(bookingForm).entries());
+      bookingStatus.textContent = `Danke ${data.name}! Wir haben deine Anfrage für den ${data.date} mit ${data.guests} Gästen erhalten und melden uns unter ${data.email} / ${data.phone}.`;
+      bookingStatus.classList.add('ok');
+      bookingForm.reset();
+    });
 
     document.getElementById('train').addEventListener('click', () => train(400));
     document.getElementById('play').addEventListener('click', playPolicy);
