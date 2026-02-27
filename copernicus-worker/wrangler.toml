@@ -1,0 +1,9 @@
+name = "flood-risk-copernicus-proxy"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://mitarano-automation.github.io"
+# Optional: Copernicus credentials (Secrets)
+# wrangler secret put COPERNICUS_CLIENT_ID
+# wrangler secret put COPERNICUS_CLIENT_SECRET

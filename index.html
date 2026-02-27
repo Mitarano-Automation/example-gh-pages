@@ -227,7 +227,7 @@
             <input type="text" id="building" name="building" placeholder="z. B. Einfamilienhaus" />
           </label>
           <button id="flood-submit" type="submit">Risiko berechnen</button>
-          <div class="hint">Hinweis: MVP mit echten Wetter-/Höhendaten (Open-Meteo + OpenStreetMap Nominatim), keine amtliche Gefahrenkarte.</div>
+          <div class="hint">Hinweis: MVP mit echten Wetter-/Höhendaten, optional Copernicus-Proxy (Cloudflare Worker). Keine amtliche Gefahrenkarte.</div>
         </form>
 
         <div>
@@ -549,19 +549,60 @@
       return Math.min(max, Math.max(min, Math.round(value)));
     }
 
-    // nearest-water heuristic from OpenStreetMap geocoding result
-    function riverRiskFromOsmClass(entry) {
-      const kind = `${entry.class || ''}:${entry.type || ''}`.toLowerCase();
-      if (kind.includes('waterway:river') || kind.includes('natural:water')) return 80;
-      if (kind.includes('waterway:stream')) return 65;
-      if (kind.includes('waterway:canal')) return 60;
-      return 35;
-    }
+    const RISK_API_BASE = 'https://REPLACE_WITH_WORKER_URL';
 
-    async function fetchJson(url) {
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' }, ...options });
       if (!res.ok) throw new Error(`HTTP ${res.status} bei ${url}`);
       return res.json();
+    }
+
+    async function fetchRiskClientSide(address, building) {
+      const geoUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(address)}`;
+      const geo = await fetchJson(geoUrl);
+      if (!Array.isArray(geo) || geo.length === 0) throw new Error('Adresse nicht gefunden.');
+      const g0 = geo[0];
+      const lat = Number(g0.lat);
+      const lon = Number(g0.lon);
+
+      const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum,precipitation_hours&hourly=rain&timezone=auto&forecast_days=3`;
+      const meteo = await fetchJson(meteoUrl);
+      const elevUrl = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
+      const elev = await fetchJson(elevUrl);
+
+      const dailyPrecip = meteo?.daily?.precipitation_sum || [0, 0, 0];
+      const dailyHours = meteo?.daily?.precipitation_hours || [0, 0, 0];
+      const hourlyRain = meteo?.hourly?.rain || [];
+      const maxDailyPrecip = Math.max(...dailyPrecip, 0);
+      const maxDailyHours = Math.max(...dailyHours, 0);
+      const maxHourlyRain = Math.max(...hourlyRain, 0);
+      const elevationM = Number(elev?.elevation?.[0] ?? 0);
+
+      const kind = `${g0.class || ''}:${g0.type || ''}`.toLowerCase();
+      const riverBase = kind.includes('waterway:river') || kind.includes('natural:water') ? 80 : kind.includes('waterway:stream') ? 65 : 35;
+      const river = clamp(riverBase);
+      const elevationRisk = clamp(100 - Math.min(100, Math.max(0, elevationM / 3)));
+      const surface = clamp(building ? 62 : 48);
+      const rain = clamp((maxDailyPrecip * 3.2) + (maxDailyHours * 2.3) + (maxHourlyRain * 6));
+      const score = clamp(river * 0.3 + elevationRisk * 0.25 + surface * 0.15 + rain * 0.3);
+
+      return {
+        location: { lat, lon, displayName: g0.display_name || address },
+        metrics: { river, elevationRisk, surface, rain },
+        score,
+        copernicus: { available: false, reason: 'worker_not_configured' }
+      };
+    }
+
+    async function fetchRiskFromWorker(address, building) {
+      if (RISK_API_BASE.includes('REPLACE_WITH_WORKER_URL')) {
+        return fetchRiskClientSide(address, building);
+      }
+      return fetchJson(`${RISK_API_BASE}/api/risk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ address, building })
+      });
     }
 
     function setMapFocus(lat, lon) {
@@ -585,47 +626,28 @@
 
       floodSubmit.disabled = true;
       floodSubmit.textContent = 'Analysiere...';
-      riskText.textContent = 'Lade Geodaten und Wetter...';
+      riskText.textContent = 'Lade Geodaten, Wetter und Copernicus-Features...';
       riskMeta.textContent = '';
 
       try {
-        const geoUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(address)}`;
-        const geo = await fetchJson(geoUrl);
-        if (!Array.isArray(geo) || geo.length === 0) {
-          throw new Error('Adresse nicht gefunden.');
-        }
+        const result = await fetchRiskFromWorker(address, building);
+        const lat = Number(result?.location?.lat);
+        const lon = Number(result?.location?.lon);
 
-        const g0 = geo[0];
-        const lat = Number(g0.lat);
-        const lon = Number(g0.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          throw new Error('Ungültige Standortdaten vom Backend.');
+        }
 
         setMapFocus(lat, lon);
 
-        const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum,precipitation_hours&hourly=rain&timezone=auto&forecast_days=3`;
-        const meteo = await fetchJson(meteoUrl);
-
-        const elevUrl = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
-        const elev = await fetchJson(elevUrl);
-
-        const dailyPrecip = meteo?.daily?.precipitation_sum || [0, 0, 0];
-        const dailyHours = meteo?.daily?.precipitation_hours || [0, 0, 0];
-        const hourlyRain = meteo?.hourly?.rain || [];
-
-        const maxDailyPrecip = Math.max(...dailyPrecip, 0);
-        const maxDailyHours = Math.max(...dailyHours, 0);
-        const maxHourlyRain = Math.max(...hourlyRain, 0);
-
-        const elevationM = Number(elev?.elevation?.[0] ?? 0);
-
-        const river = clamp(riverRiskFromOsmClass(g0));
-        const elevationRisk = clamp(100 - Math.min(100, Math.max(0, elevationM / 3)));
-        const surface = clamp(building ? 62 : 48); // very rough MVP fallback
-        const rain = clamp((maxDailyPrecip * 3.2) + (maxDailyHours * 2.3) + (maxHourlyRain * 6));
-
-        const score = clamp(river * 0.3 + elevationRisk * 0.25 + surface * 0.15 + rain * 0.3);
+        const river = clamp(result?.metrics?.river ?? 0);
+        const elevationRisk = clamp(result?.metrics?.elevationRisk ?? 0);
+        const surface = clamp(result?.metrics?.surface ?? 0);
+        const rain = clamp(result?.metrics?.rain ?? 0);
+        const score = clamp(result?.score ?? 0);
         const b = bucket(score);
 
-        riskAddress.textContent = address;
+        riskAddress.textContent = result?.location?.displayName || address;
         riskLabel.textContent = b.label;
         riskLabel.className = `risk-pill risk-${b.key}`;
         riskScore.textContent = String(score);
@@ -647,7 +669,8 @@
             : 'Empfehlung: Aktuell niedriges Risiko, dennoch jährliche Prüfung sinnvoll.';
 
         riskText.textContent = rec;
-        riskMeta.textContent = `Datenbasis: Nominatim + Open-Meteo | Koordinaten: ${lat.toFixed(4)}, ${lon.toFixed(4)} | Höhe: ${Math.round(elevationM)} m`;
+        const cop = result?.copernicus || {};
+        riskMeta.textContent = `Datenbasis: Nominatim + Open-Meteo + Copernicus Proxy | Koordinaten: ${lat.toFixed(4)}, ${lon.toFixed(4)} | Copernicus: ${cop.available ? 'aktiv' : 'Fallback'}${cop.soilMoistureAnomaly != null ? ` | Soil Moisture Anomaly: ${cop.soilMoistureAnomaly}` : ''}`;
       } catch (err) {
         riskText.textContent = `Fehler bei der Analyse: ${err.message}`;
         riskMeta.textContent = 'Bitte andere Adresse versuchen oder später erneut.';
