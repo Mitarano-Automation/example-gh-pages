@@ -226,7 +226,6 @@
       document.body.classList.toggle('light', light);
       themeBtn.textContent = light ? '🌙 Dark Mode' : '☀️ Light Mode';
       localStorage.setItem('rl-theme', light ? 'light' : 'dark');
-      draw(env);
     }
 
     applyTheme(localStorage.getItem('rl-theme') || 'dark');
@@ -386,6 +385,7 @@
     document.getElementById('play').addEventListener('click', playPolicy);
     document.getElementById('theme').addEventListener('click', () => {
       applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+      draw(env);
     });
     document.getElementById('reset').addEventListener('click', () => {
       env.reset();
