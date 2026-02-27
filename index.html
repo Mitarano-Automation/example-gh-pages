@@ -194,8 +194,8 @@
             Gebäudetyp
             <input type="text" id="building" name="building" placeholder="z. B. Einfamilienhaus" />
           </label>
-          <button type="submit">Risiko berechnen</button>
-          <div class="hint">Hinweis: Dies ist eine UI-Demo mit simulierten Werten, keine amtliche Gefahrenkarte.</div>
+          <button id="flood-submit" type="submit">Risiko berechnen</button>
+          <div class="hint">Hinweis: MVP mit echten Wetter-/Höhendaten (Open-Meteo + OpenStreetMap Nominatim), keine amtliche Gefahrenkarte.</div>
         </form>
 
         <div>
@@ -211,6 +211,7 @@
           <div class="metric stat">Versiegelung: <b id="m-surface">0</b>/100</div>
           <div class="metric stat">Starkregen-Historie: <b id="m-rain">0</b>/100</div>
           <div id="risk-text" class="hint">Gib links eine Adresse ein und starte die Analyse.</div>
+          <div id="risk-meta" class="hint"></div>
         </div>
       </div>
     </section>
@@ -479,26 +480,19 @@
       playing = false;
     }
 
-    // --- Flood risk dashboard demo logic
+    // --- Flood risk dashboard MVP logic (real API data)
     const floodForm = document.getElementById('flood-form');
+    const floodSubmit = document.getElementById('flood-submit');
     const riskAddress = document.getElementById('risk-address');
     const riskLabel = document.getElementById('risk-label');
     const riskScore = document.getElementById('risk-score');
     const riskBar = document.getElementById('risk-bar');
     const riskText = document.getElementById('risk-text');
+    const riskMeta = document.getElementById('risk-meta');
     const mRiver = document.getElementById('m-river');
     const mElevation = document.getElementById('m-elevation');
     const mSurface = document.getElementById('m-surface');
     const mRain = document.getElementById('m-rain');
-
-    function hashStr(str) {
-      let h = 2166136261;
-      for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
-      }
-      return Math.abs(h >>> 0);
-    }
 
     function bucket(score) {
       if (score < 35) return { key: 'low', label: 'NIEDRIG' };
@@ -506,38 +500,99 @@
       return { key: 'high', label: 'HOCH' };
     }
 
-    floodForm.addEventListener('submit', (e) => {
+    function clamp(value, min = 0, max = 100) {
+      return Math.min(max, Math.max(min, Math.round(value)));
+    }
+
+    // nearest-water heuristic from OpenStreetMap geocoding result
+    function riverRiskFromOsmClass(entry) {
+      const kind = `${entry.class || ''}:${entry.type || ''}`.toLowerCase();
+      if (kind.includes('waterway:river') || kind.includes('natural:water')) return 80;
+      if (kind.includes('waterway:stream')) return 65;
+      if (kind.includes('waterway:canal')) return 60;
+      return 35;
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status} bei ${url}`);
+      return res.json();
+    }
+
+    floodForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = new FormData(floodForm);
       const address = String(form.get('address') || '').trim();
       const building = String(form.get('building') || '').trim();
-      const seed = hashStr(address + '|' + building);
 
-      const river = seed % 101;
-      const elevation = (seed >> 3) % 101;
-      const surface = (seed >> 7) % 101;
-      const rain = (seed >> 11) % 101;
-      const score = Math.round(river * 0.35 + (100 - elevation) * 0.25 + surface * 0.2 + rain * 0.2);
-      const b = bucket(score);
+      if (!address) return;
 
-      riskAddress.textContent = address;
-      riskLabel.textContent = b.label;
-      riskLabel.className = `risk-pill risk-${b.key}`;
-      riskScore.textContent = String(score);
-      riskBar.style.width = `${score}%`;
+      floodSubmit.disabled = true;
+      floodSubmit.textContent = 'Analysiere...';
+      riskText.textContent = 'Lade Geodaten und Wetter...';
+      riskMeta.textContent = '';
 
-      mRiver.textContent = String(river);
-      mElevation.textContent = String(elevation);
-      mSurface.textContent = String(surface);
-      mRain.textContent = String(rain);
+      try {
+        const geoUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(address)}`;
+        const geo = await fetchJson(geoUrl);
+        if (!Array.isArray(geo) || geo.length === 0) {
+          throw new Error('Adresse nicht gefunden.');
+        }
 
-      const rec = b.key === 'high'
-        ? 'Empfehlung: Rückstausicherung, mobile Schutzsysteme und Versicherungscheck priorisieren.'
-        : b.key === 'medium'
-          ? 'Empfehlung: Präventive Maßnahmen prüfen (Kellerabdichtung, Entwässerung, Notfallplan).'
-          : 'Empfehlung: Aktuell niedriges Risiko, dennoch jährliche Prüfung sinnvoll.';
+        const g0 = geo[0];
+        const lat = Number(g0.lat);
+        const lon = Number(g0.lon);
 
-      riskText.textContent = rec;
+        const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum,precipitation_hours&hourly=rain&timezone=auto&forecast_days=3`;
+        const meteo = await fetchJson(meteoUrl);
+
+        const elevUrl = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
+        const elev = await fetchJson(elevUrl);
+
+        const dailyPrecip = meteo?.daily?.precipitation_sum || [0, 0, 0];
+        const dailyHours = meteo?.daily?.precipitation_hours || [0, 0, 0];
+        const hourlyRain = meteo?.hourly?.rain || [];
+
+        const maxDailyPrecip = Math.max(...dailyPrecip, 0);
+        const maxDailyHours = Math.max(...dailyHours, 0);
+        const maxHourlyRain = Math.max(...hourlyRain, 0);
+
+        const elevationM = Number(elev?.elevation?.[0] ?? 0);
+
+        const river = clamp(riverRiskFromOsmClass(g0));
+        const elevationRisk = clamp(100 - Math.min(100, Math.max(0, elevationM / 3)));
+        const surface = clamp(building ? 62 : 48); // very rough MVP fallback
+        const rain = clamp((maxDailyPrecip * 3.2) + (maxDailyHours * 2.3) + (maxHourlyRain * 6));
+
+        const score = clamp(river * 0.3 + elevationRisk * 0.25 + surface * 0.15 + rain * 0.3);
+        const b = bucket(score);
+
+        riskAddress.textContent = address;
+        riskLabel.textContent = b.label;
+        riskLabel.className = `risk-pill risk-${b.key}`;
+        riskScore.textContent = String(score);
+        riskBar.style.width = `${score}%`;
+
+        mRiver.textContent = String(river);
+        mElevation.textContent = String(elevationRisk);
+        mSurface.textContent = String(surface);
+        mRain.textContent = String(rain);
+
+        const rec = b.key === 'high'
+          ? 'Empfehlung: Rückstausicherung, mobile Schutzsysteme und Versicherungscheck priorisieren.'
+          : b.key === 'medium'
+            ? 'Empfehlung: Präventive Maßnahmen prüfen (Kellerabdichtung, Entwässerung, Notfallplan).'
+            : 'Empfehlung: Aktuell niedriges Risiko, dennoch jährliche Prüfung sinnvoll.';
+
+        riskText.textContent = rec;
+        riskMeta.textContent = `Datenbasis: Nominatim + Open-Meteo | Koordinaten: ${lat.toFixed(4)}, ${lon.toFixed(4)} | Höhe: ${Math.round(elevationM)} m`;
+      } catch (err) {
+        riskText.textContent = `Fehler bei der Analyse: ${err.message}`;
+        riskMeta.textContent = 'Bitte andere Adresse versuchen oder später erneut.';
+      } finally {
+        floodSubmit.disabled = false;
+        floodSubmit.textContent = 'Risiko berechnen';
+      }
     });
 
     document.getElementById('train').addEventListener('click', () => train(400));
