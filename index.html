@@ -15,6 +15,11 @@
       --canvas: #0b1220;
       --stat: #cbd5e1;
       --ok: #34d399;
+      --track: #334155;
+      --cart: #60a5fa;
+      --pole: #f59e0b;
+      --pivot: #e5e7eb;
+      --hud: #94a3b8;
     }
     body.light {
       color-scheme: light;
@@ -26,6 +31,11 @@
       --canvas: #eef2f7;
       --stat: #334155;
       --ok: #059669;
+      --track: #94a3b8;
+      --cart: #2563eb;
+      --pole: #d97706;
+      --pivot: #0f172a;
+      --hud: #334155;
     }
     body {
       margin: 0;
@@ -72,6 +82,7 @@
       color: white;
     }
     button.secondary { background: #334155; }
+    body.light button.secondary { background: #64748b; }
     .stat {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: .92rem;
@@ -236,9 +247,11 @@
     function draw(e) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      const css = getComputedStyle(document.body);
+
       // Track line
       const y = 260;
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = css.getPropertyValue('--track').trim();
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(40, y + 20);
@@ -250,7 +263,7 @@
 
       // Cart
       const cw = 70, ch = 30;
-      ctx.fillStyle = '#60a5fa';
+      ctx.fillStyle = css.getPropertyValue('--cart').trim();
       ctx.fillRect(sx - cw/2, y, cw, ch);
 
       // Pole
@@ -260,7 +273,7 @@
       const ex = px + poleLenPx * Math.sin(e.theta);
       const ey = py - poleLenPx * Math.cos(e.theta);
 
-      ctx.strokeStyle = '#f59e0b';
+      ctx.strokeStyle = css.getPropertyValue('--pole').trim();
       ctx.lineWidth = 7;
       ctx.beginPath();
       ctx.moveTo(px, py);
@@ -268,13 +281,13 @@
       ctx.stroke();
 
       // Pivot
-      ctx.fillStyle = '#e5e7eb';
+      ctx.fillStyle = css.getPropertyValue('--pivot').trim();
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
 
       // HUD
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = css.getPropertyValue('--hud').trim();
       ctx.font = '14px ui-monospace, monospace';
       ctx.fillText(`x=${e.x.toFixed(2)}  theta=${(e.theta*180/Math.PI).toFixed(2)}°`, 14, 24);
     }
