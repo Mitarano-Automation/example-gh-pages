@@ -5,12 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RL Cart-Pole Demo (JavaScript)</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+      --bg: #0f172a;
+      --text: #e2e8f0;
+      --wrap: #111827;
+      --border: #334155;
+      --muted: #94a3b8;
+      --canvas: #0b1220;
+      --stat: #cbd5e1;
+      --ok: #34d399;
+    }
+    body.light {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --text: #0f172a;
+      --wrap: #ffffff;
+      --border: #cbd5e1;
+      --muted: #475569;
+      --canvas: #eef2f7;
+      --stat: #334155;
+      --ok: #059669;
+    }
     body {
       margin: 0;
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: grid;
       place-items: center;
@@ -18,19 +39,19 @@
     }
     .wrap {
       width: min(900px, 100%);
-      background: #111827;
-      border: 1px solid #334155;
+      background: var(--wrap);
+      border: 1px solid var(--border);
       border-radius: 14px;
       padding: 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,.18);
     }
     h1 { margin: 0 0 6px; font-size: 1.35rem; }
-    p { margin: 0 0 12px; color: #94a3b8; }
+    p { margin: 0 0 12px; color: var(--muted); }
     canvas {
       width: 100%;
       height: auto;
-      background: #0b1220;
-      border: 1px solid #334155;
+      background: var(--canvas);
+      border: 1px solid var(--border);
       border-radius: 10px;
       display: block;
     }
@@ -54,9 +75,9 @@
     .stat {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: .92rem;
-      color: #cbd5e1;
+      color: var(--stat);
     }
-    .ok { color: #34d399; }
+    .ok { color: var(--ok); }
   </style>
 </head>
 <body>
@@ -70,6 +91,7 @@
       <button id="train">Training starten (400 Episoden)</button>
       <button id="play" class="secondary">Beste Policy zeigen</button>
       <button id="reset" class="secondary">Reset</button>
+      <button id="theme" class="secondary">☀️ Light Mode</button>
       <span id="status" class="stat">Bereit.</span>
     </div>
 
@@ -197,6 +219,17 @@
     const stepsEl = document.getElementById('steps');
     const avgEl = document.getElementById('avg');
     const bestEl = document.getElementById('best');
+    const themeBtn = document.getElementById('theme');
+
+    function applyTheme(mode) {
+      const light = mode === 'light';
+      document.body.classList.toggle('light', light);
+      themeBtn.textContent = light ? '🌙 Dark Mode' : '☀️ Light Mode';
+      localStorage.setItem('rl-theme', light ? 'light' : 'dark');
+      draw(env);
+    }
+
+    applyTheme(localStorage.getItem('rl-theme') || 'dark');
 
     const env = new CartPole();
     env.reset();
@@ -351,6 +384,9 @@
 
     document.getElementById('train').addEventListener('click', () => train(400));
     document.getElementById('play').addEventListener('click', playPolicy);
+    document.getElementById('theme').addEventListener('click', () => {
+      applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+    });
     document.getElementById('reset').addEventListener('click', () => {
       env.reset();
       Q.clear(); // current learned policy reset
