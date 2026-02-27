@@ -187,6 +187,18 @@
       color: var(--text);
       backdrop-filter: blur(4px);
     }
+    .hero-image {
+      margin: 10px 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .hero-image img {
+      width: 100%;
+      max-height: 360px;
+      object-fit: cover;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -194,6 +206,10 @@
     <h1>🤖 RL Demo: Cart-Pole balancieren (Q-Learning)</h1>
     <p>Ein simples Beispiel ohne externe Libraries. Agent lernt per diskretisiertem Zustand + Q-Tabelle.</p>
     <p>✨ Aus Chaos wird Balance: Mit jedem Versuch lernt der Agent ein bisschen besser, wie aus kleinen Entscheidungen ein stabiler Lauf entsteht.</p>
+
+    <figure class="hero-image">
+      <img src="assets/universitaet-potsdam.jpg" alt="Universität Potsdam Campus" loading="lazy" />
+    </figure>
 
     <canvas id="sim" width="860" height="360" aria-label="Cart Pole Simulation"></canvas>
 
